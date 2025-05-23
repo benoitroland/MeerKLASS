@@ -21,3 +21,21 @@ cp -r /usr/local/src/SAOImageDS9 /scratch
 cp -r /usr/local/src/lotss-query /scratch
 
 cp -r /usr/local/src/lotss-hba-survey /scratch
+
+cp -r /usr/local/src/ddf-pipeline /scratch
+
+LSMTool: rm -rf LSMTool/.eggs
+
+LofarStMan: rm -rf LofarStMan/cbuild
+           
+killMS: rm -rf killMS/killMS/cbuild
+
+ddf-pipeline:
+
+cd ddf-pipeline
+git add init.sh 
+git commit -m "add init.sh in ddf-pipeline"
+
+cd ..
+git add ddf-pipeline
+git commit -m "add ddf-pipeline"
