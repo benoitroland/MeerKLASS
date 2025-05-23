@@ -1,0 +1,12 @@
+set STRING_ 257
+set ENTRY_ 258
+set FILEDIALOG_ 259
+set MESSAGE_ 260
+set MODE_ 261
+set OPEN_ 262
+set SAVE_ 263
+set TASK_ 264
+set LOCK_ 265
+set OK_ 266
+set OKCANCEL_ 267
+set YESNO_ 268

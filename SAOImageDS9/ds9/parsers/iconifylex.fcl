@@ -1,0 +1,14 @@
+#tab iconifyparser.tab.tcl
+
+%{
+%}
+
+#include defs.fin
+
+%%
+
+#include yesno.fin
+#include string.fin
+#include ws.fin
+
+%%

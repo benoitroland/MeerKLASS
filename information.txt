@@ -1,0 +1,23 @@
+singularity shell --bind ~/Astronomy-LMU/MeerKLASS:/scratch ddf.sif
+
+cp -r /usr/local/src/ms_info /scratch
+
+cp -r /usr/local/src/DDFacet /scratch
+
+cp -r /usr/local/src/killMS /scratch
+
+cp -r /usr/local/src/drawMS /scratch
+
+cp -r /usr/local/src/DynSpecMS /scratch
+
+cp -r /usr/local/src/LSMTool /scratch 
+
+cp -r /usr/local/src/LofarStMan /scratch
+
+cp -r /usr/local/src/fitsio /scratch 
+
+cp -r /usr/local/src/SAOImageDS9 /scratch
+
+cp -r /usr/local/src/lotss-query /scratch
+
+cp -r /usr/local/src/lotss-hba-survey /scratch

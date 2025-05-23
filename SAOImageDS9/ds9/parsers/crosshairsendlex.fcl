@@ -1,0 +1,19 @@
+#tab crosshairsendparser.tab.tcl
+
+%{
+%}
+
+#include defs.fin
+
+%%
+
+lock	    {return $LOCK_}
+
+#include coordsys.fin
+#include wcssys.fin
+#include skyframe.fin
+#include skyformat.fin
+#include ws.fin
+
+%%
+

@@ -1,0 +1,14 @@
+#tab cursorparser.tab.tcl
+
+%{
+%}
+
+#include defs.fin
+
+%%
+
+#include int.fin
+#include string.fin
+#include ws.fin
+
+%%

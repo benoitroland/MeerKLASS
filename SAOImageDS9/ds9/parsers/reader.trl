@@ -1,0 +1,6 @@
+reader : RDB_ {set _ starbase_read}
+ | SB_ {set _ starbase_read}
+ | STARBASE_ {set _ starbase_read}
+ | CSV_ {set _ TSVRead}
+ | TSV_ {set _ TSVRead}
+ ;

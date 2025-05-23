@@ -1,0 +1,18 @@
+#tab skyviewparser.tab.tcl
+
+%{
+%}
+
+#include defs.fin
+
+%%
+
+pixels	    {return $PIXELS_}
+
+#include yesno.fin
+#include imgsvr.fin
+#include numeric.fin
+#include string.fin
+#include ws.fin
+
+%%

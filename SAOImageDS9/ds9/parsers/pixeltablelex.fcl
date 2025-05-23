@@ -1,0 +1,17 @@
+#tab pixeltableparser.tab.tcl
+
+%{
+%}
+
+#include defs.fin
+
+%%
+
+close	    {return $CLOSE_}
+open	    {return $OPEN_}
+
+#include yesno.fin
+#include string.fin
+#include ws.fin
+
+%%

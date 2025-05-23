@@ -1,0 +1,5 @@
+rdb		{return $RDB_}
+sb		{return $SB_}
+starbase	{return $STARBASE_}
+csv		{return $CSV_}
+tsv		{return $TSV_}
