@@ -1,0 +1,94 @@
+singularity shell --bind ~/Astronomy-LMU/MeerKLASS:/scratch ddf.sif
+
+### packages (image) ###
+
+cp -r /usr/local/src/ms_info /scratch
+
+cp -r /usr/local/src/DDFacet /scratch
+
+cp -r /usr/local/src/killMS /scratch
+
+cp -r /usr/local/src/drawMS /scratch
+
+cp -r /usr/local/src/DynSpecMS /scratch
+
+cp -r /usr/local/src/LSMTool /scratch 
+
+cp -r /usr/local/src/LofarStMan /scratch
+
+cp -r /usr/local/src/fitsio /scratch 
+
+cp -r /usr/local/src/SAOImageDS9 /scratch
+
+cp -r /usr/local/src/lotss-query /scratch
+
+cp -r /usr/local/src/lotss-hba-survey /scratch
+
+cp -r /usr/local/src/ddf-pipeline /scratch
+
+### packages (meerklass) ###
+
+rm -rf ms_info/.git*
+git add ms_info
+
+rm -rf DDFacet/.git*
+git add DDFacet
+
+rm -rf killMS/.git*
+rm -rf killMS/killMS/cbuild
+git add killMS
+
+rm -rf drawMS/.git*
+git add drawMS
+
+rm -rf DynSpecMS/.git*
+git add DynSpecMS
+
+rm -rf LSMTool/.git*
+rm -rf LSMTool/.eggs
+git add LSMTool
+
+rm -rf LofarStMan/.git*
+rm -rf LofarStMan/cbuild
+git add LofarStMan
+
+rm -rf fitsio/.git*
+git add fitsio
+
+git add SAOImageDS9
+
+rm -rf lotss-query/.git*
+git add lotss-query
+
+rm -rf lotss-hba-survey/.git*
+git add lotss-hba-survey
+
+rm -rf ddf-pipeline/.git*
+git add ddf-pipeline
+
+### directories and scripts (image) ###
+
+cp -r /MACARON /scratch
+
+cp /usr/bin/setDev.sh /scratch
+cp /etc/profile.d/set-alias.sh /scratch
+cp /usr/bin/logo.py /scratch
+cp /parset/tier1-minimal.cfg /scratch
+
+### directories and scripts (meerklass) ###
+
+rm -f MACARON/*~
+git add MACARON
+
+mkdir Utils
+
+mv setDev.sh Utils
+mv set-alias.sh Utils
+mv logo.py Utils
+mv tier1-minimal.cfg Utils
+
+git add Utils
+
+### catalogs ###
+
+cp -r /CATALOGS /scratch
