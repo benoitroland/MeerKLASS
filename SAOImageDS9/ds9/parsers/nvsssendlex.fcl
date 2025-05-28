@@ -1,0 +1,13 @@
+#tab nvsssendparser.tab.tcl
+
+%{
+%}
+
+#include defs.fin
+
+%%
+
+#include imgsvrsend.fin
+#include ws.fin
+
+%%

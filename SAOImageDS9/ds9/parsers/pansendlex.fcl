@@ -1,0 +1,17 @@
+#tab pansendparser.tab.tcl
+
+%{
+%}
+
+#include defs.fin
+
+%%
+
+#include coordsys.fin
+#include wcssys.fin
+#include skyframe.fin
+#include skyformat.fin
+#include ws.fin
+
+%%
+

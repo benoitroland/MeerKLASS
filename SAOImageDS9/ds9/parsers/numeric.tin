@@ -1,0 +1,2 @@
+%token INT_ integer
+%token REAL_ float

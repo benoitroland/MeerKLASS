@@ -1,0 +1,12 @@
+prefix=/usr/local/src/fitsio/build/temp.linux-x86_64-3.9/cfitsio3490
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: cfitsio
+Description: FITS File Subroutine Library
+URL: https://heasarc.gsfc.nasa.gov/fitsio/
+Version: 3.49
+Libs: -L${libdir} -lcfitsio
+Libs.private: -lm -lbz2 
+Cflags: -I${includedir}

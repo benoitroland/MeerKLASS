@@ -1,0 +1,15 @@
+#tab skyviewsendparser.tab.tcl
+
+%{
+%}
+
+#include defs.fin
+
+%%
+
+pixels	    {return $PIXELS_}
+
+#include imgsvrsend.fin
+#include ws.fin
+
+%%

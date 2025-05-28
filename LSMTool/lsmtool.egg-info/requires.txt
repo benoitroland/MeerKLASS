@@ -1,0 +1,5 @@
+astropy>=3.2
+everybeam
+matplotlib>=0.99
+numpy
+scipy>=0.11

@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC -O3 -DNDEBUG -ggdb3 -fopenmp -fmax-errors=1 -Wconversion -W -Wall -std=c99    -ffast-math -shared -Wl,-soname,_pyGridder3x.so -o _pyGridder3x.so CMakeFiles/_pyGridder3x.dir/Gridder.c.o  -lrt -lpython3.9 

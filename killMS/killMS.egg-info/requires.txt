@@ -1,0 +1,7 @@
+
+[:python_version >= "3"]
+DDFacet>=0.5.0
+bdsf>1.8.15
+
+[fits-beam-support]
+meqtrees-cattery

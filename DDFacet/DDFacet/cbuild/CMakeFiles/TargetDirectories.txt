@@ -1,0 +1,10 @@
+/usr/local/src/DDFacet/DDFacet/cbuild/CMakeFiles/rebuild_cache.dir
+/usr/local/src/DDFacet/DDFacet/cbuild/CMakeFiles/edit_cache.dir
+/usr/local/src/DDFacet/DDFacet/cbuild/Gridder/CMakeFiles/rebuild_cache.dir
+/usr/local/src/DDFacet/DDFacet/cbuild/Gridder/CMakeFiles/edit_cache.dir
+/usr/local/src/DDFacet/DDFacet/cbuild/Gridder/CMakeFiles/_pyGridderSmearPols3x.dir
+/usr/local/src/DDFacet/DDFacet/cbuild/Gridder/CMakeFiles/_pyArrays3x.dir
+/usr/local/src/DDFacet/DDFacet/cbuild/Gridder/old_c_gridder/CMakeFiles/rebuild_cache.dir
+/usr/local/src/DDFacet/DDFacet/cbuild/Gridder/old_c_gridder/CMakeFiles/edit_cache.dir
+/usr/local/src/DDFacet/DDFacet/cbuild/Gridder/old_c_gridder/CMakeFiles/_pyGridderSmearPolsClassic3x.dir
+/usr/local/src/DDFacet/DDFacet/cbuild/Gridder/old_c_gridder/CMakeFiles/_pyGridder3x.dir

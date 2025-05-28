@@ -1,0 +1,52 @@
+
+############################################
+############# Parallel ######################
+############################################
+
+Parallel.Enable				= True
+Parallel.NCPU				= 6
+
+
+##########################################################################################################################
+################################################ FILES ###################################################################
+##########################################################################################################################
+
+##### MSCat and SkyModel
+Files.FileMSCat.Name =  [/media/6B5E-87D0/killMS2/TEST/Simul/0000.MS]
+Files.killMSSolutionFile = None # /media/6B5E-87D0/killMS2/TEST/Simul/Simul.npz
+
+Files.ColName =  CORRECTED_DATA
+
+##### Flag baselines and antenna
+Select.FlagAntBL  = None # RS,CS017LBA
+Select.UVRangeKm  = None # [0.1, 20] # [0.1, 10] # [0.1, 20] # in km
+
+##########################################################################################################################
+################################################ Imager Parset ###########################################################
+##########################################################################################################################
+
+Facet.Robust					= -2
+Facet.Precision					= S # S: single precision - D: double precision
+Facet.PolMode					= I # I: I Stockes - IQUV: full stockes
+Facet.TChunkSize				= 10 # In hours
+Facet.ConstructMode				= Fader # Fader/Sharp
+
+Facet.SolSpaceInterp.Type			= Nearest # Krigging or Nearest
+Facet.SolSpaceInterp.Scale			= 1.       # in Degrees
+Facet.SolSpaceInterp.gamma			= 2.
+
+Facet.MainFacetOptions.Support			= 7
+Facet.MainFacetOptions.NFacets			= 1
+Facet.MainFacetOptions.OverS			= 5
+Facet.MainFacetOptions.wmax			= 10000.
+Facet.MainFacetOptions.Nw			= 200
+Facet.MainFacetOptions.Npix			= 256
+Facet.MainFacetOptions.Cell			= 1.
+Facet.MainFacetOptions.Padding			= 1.5
+
+Facet.MajorCycleOptions.MaxMajorIter		= 20
+
+Facet.MinorCycleOptions.Gain			= 0.1
+Facet.MinorCycleOptions.MaxMinorIter		= 2000
+Facet.MinorCycleOptions.CycleFactor		= 2.5
+

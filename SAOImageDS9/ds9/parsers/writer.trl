@@ -1,0 +1,6 @@
+writer : RDB_ {set _ starbase_write}
+ | SB_ {set _ starbase_write}
+ | STARBASE_ {set _ starbase_write}
+ | CSV_ {set _ TSVWrite}
+ | TSV_ {set _ TSVWrite}
+ ;

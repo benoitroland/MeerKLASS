@@ -1,0 +1,14 @@
+#tab sleepparser.tab.tcl
+
+%{
+%}
+
+#include defs.fin
+
+%%
+
+#include numeric.fin
+#include string.fin
+#include ws.fin
+
+%%

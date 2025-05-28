@@ -1,0 +1,401 @@
+'''
+DDFacet, a facet-based radio imaging package
+Copyright (C) 2013-2016  Cyril Tasse, l'Observatoire de Paris,
+SKA South Africa, Rhodes University
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+'''
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+from DDFacet.compatibility import range
+
+import numpy as np
+import numexpr
+from DDFacet.Other import logger
+log= logger.getLogger("ClassBeamMean")
+from DDFacet.ToolsDir import ModCoord
+from DDFacet.Data import ClassJones
+from DDFacet.Imager import ModCF
+from DDFacet.ToolsDir import ModFFTW
+from DDFacet.Other import ClassTimeIt
+from DDFacet.Array import shared_dict
+from scipy.interpolate import griddata
+from DDFacet.Other.AsyncProcessPool import APP
+import copy
+import os
+
+class ClassBeamMean():
+    def __init__(self,VS):
+        logger.setSilent(["ClassJones", "ClassLOFARBeam"])
+        self.VS=VS
+        
+        self.GD=copy.deepcopy(self.VS.GD)
+        self.DoCentralNorm=self.GD["Beam"]["CenterNorm"]
+        self.SmoothBeam=None
+        self.CheckCache()
+        if self.CacheValid:
+            logger.setLoud(["ClassJones", "ClassLOFARBeam"])
+            return
+
+        #self.GD["Beam"]["CenterNorm"]=0
+
+        self.ListMS=self.VS.ListMS
+        self.MS=self.ListMS[0]
+        rac,decc=self.MS.radec
+        self.CoordMachine=ModCoord.ClassCoordConv(rac,decc)
+        self.CalcGrid()
+        #self.Padding=Padding
+
+        #self.SumJJsq=np.zeros((self.npix,self.npix,self.MS.Nchan),np.float64)
+        #self.SumWsq=np.zeros((1,self.MS.Nchan),np.float64)
+
+        self.StackedBeamDict = shared_dict.create("StackedBeamDict")
+        for iDir in range(self.NDir):
+            sd = self.StackedBeamDict.addSubdict(iDir)
+            sd.addSharedArray("SumJJsq", (self.VS.NFreqBands,), np.float64)
+            sd.addSharedArray("SumWsq", (self.VS.NFreqBands,), np.float64)
+        
+        self.DicoJonesMachine={}
+        for iMS,MS in enumerate(self.ListMS):
+            JonesMachine=ClassJones.ClassJones(self.GD,MS,self.VS.FacetMachine)
+            JonesMachine.InitBeamMachine()
+            self.DicoJonesMachine[iMS]=JonesMachine
+        logger.setLoud(["ClassJones", "ClassLOFARBeam"])
+
+    def CalcGrid(self):
+        _,_,nx,ny=self.VS.FullImShape
+        CellSizeRad_x,CellSizeRad_y=self.VS.CellSizeRad
+        FOV_x=nx*CellSizeRad_x
+        FOV_y=ny*CellSizeRad_y
+        npix_x=npix_y=self.GD["Beam"]["SmoothNPix"]
+        if nx<ny:
+            npix_x=self.GD["Beam"]["SmoothNPix"]
+            npix_y=int(ny/nx*npix_x)
+        elif nx>ny:
+            npix_y=self.GD["Beam"]["SmoothNPix"]
+            npix_x=int(nx/ny*npix_y)
+        log.print("Estimating the smooth beam on a grid of size %i x %i "%(npix_x,npix_y))
+            
+        #lm=np.linspace(-FOV/2.,FOV/2.,npix)
+        #ll=(lm[0:-1]+lm[1::])/2.
+        
+        lmin=-FOV_x/2.
+        lmax=FOV_x/2.
+        mmin=-FOV_y/2.
+        mmax=FOV_y/2.
+        lc,mc=np.mgrid[lmin:lmax:1j*npix_x,mmin:mmax:1j*npix_y]
+        self.lBeam,self.mBeam=lc,mc
+        iPix,jPix=np.mgrid[0:npix_x,0:npix_y]
+        self.iPix=iPix.ravel()
+        self.jPix=jPix.ravel()
+        lc=lc.flatten()
+        mc=mc.flatten()
+        ra=np.zeros_like(lc)
+        dec=np.zeros_like(lc)
+        for i in range(ra.size):
+            ra[i],dec[i]=self.CoordMachine.lm2radec(np.array([lc[i]]),
+                                                    np.array([mc[i]]))
+        self.radec=ra,dec
+        self.npix_x=npix_x
+        self.npix_y=npix_y
+        self.NDir=ra.size
+
+    def StackBeam(self,ThisMSData,iDir):
+        self.StackedBeamDict.reload()
+        logger.setSilent("ClassJones")
+        Dt=self.GD["Beam"]["DtBeamMin"]*60.
+        JonesMachine=self.DicoJonesMachine[ThisMSData["iMS"]]
+        RAs,DECs = self.radec
+
+        times=ThisMSData["times"]
+        A0=ThisMSData["A0"]
+        A1=ThisMSData["A1"]
+        flags=ThisMSData["flags"]
+        W=ThisMSData["Weights"]
+        ChanToFreqBand=ThisMSData["ChanMapping"]
+        beam_times = np.array(JonesMachine.BeamMachine.getBeamSampleTimes(times, quiet=True))
+
+        T2=ClassTimeIt.ClassTimeIt()
+        T2.disable()
+        CurrentBeamITime=-1
+        # #print "  Estimate beam in %i directions"%(RAs.size)
+        # MS=self.ListMS[ThisMSData["iMS"]]
+        # JonesMachine=ClassJones.ClassJones(self.GD,MS,self.VS.FacetMachine)
+        # JonesMachine.InitBeamMachine()
+        DicoBeam=JonesMachine.EstimateBeam(beam_times, RAs[iDir:iDir+1], DECs[iDir:iDir+1], progressBar=False, quiet=True)
+
+        T2.timeit("GetBeam 1")
+        #DicoBeam=JonesMachine.EstimateBeam(beam_times, RAs[0:10], DECs[0:10],progressBar=False)
+        #T2.timeit("GetBeam 10")
+        #print DicoBeam["Jones"].shape
+        NTRange=DicoBeam["t0"].size
+        #pBAR= ProgressBar(Title="      Mean Beam")
+        #pBAR.render(0, '%4i/%i' % (0,NTRange))
+        T=ClassTimeIt.ClassTimeIt("Stacking")
+        T.disable()
+        
+        # DicoBeam["Jones"].shape = nt, nd, na, nch, _, _
+        # [(x, y) for x in [1,2,3] for y in [3,1,4] if x != y]
+        
+        for iTRange in range(DicoBeam["t0"].size):
+        
+            t0=DicoBeam["t0"][iTRange]
+            t1=DicoBeam["t1"][iTRange]
+            J=np.abs(DicoBeam["Jones"][iTRange])
+            indt=np.where((times>=t0)&(times<t1))[0]
+            ThisT=np.sort(np.unique(times[indt]))
+            
+            for tt in ThisT:
+                ind=np.where(times==tt)[0]
+                T.timeit("0")
+                A0s=A0[ind]
+                A1s=A1[ind]
+                fs=flags[ind]
+                Ws=W[ind]
+                MSnchan=Ws.shape[1]
+                T.timeit("1")
+            
+                nd,na,nch,_,_=J.shape
+            
+                # ######################
+                # This call is slow
+                J0=J[:,A0s,:,:,:]
+                J1=J[:,A1s,:,:,:]
+                # J0=J0[:,:,DicoBeam["VisToJonesChanMapping"],:,:]
+                # J1=J1[:,:,DicoBeam["VisToJonesChanMapping"],:,:]
+                
+                
+                T.timeit("2")
+                # ######################
+                
+                # J0=np.zeros((nd,A0s.size,nch,2,2),dtype=J.dtype)
+                # #T.timeit("1a")
+                # J0List=[J[:,A0s[i],:,:,:] for i in range(A0s.size)]
+                # #T.timeit("1b")
+                # J1=np.zeros((nd,A0s.size,nch,2,2),dtype=J.dtype)
+                # #T.timeit("1c")
+                # J1List=[J[:,A1s[i],:,:,:] for i in range(A0s.size)]
+                # #T.timeit("1d")
+                # for i in range(A0s.size):
+                #     J0[:,i,:,:,:]=J0List[i]
+                #     J1[:,i,:,:,:]=J1List[i]
+                # T.timeit("2b")
+                
+                
+                JJ=(J0[:,:,:,0,0]*J1[:,:,:,0,0].conj()+J0[:,:,:,1,1]*J1[:,:,:,1,1].conj())/2.
+                
+                T.timeit("3")
+                
+                WWs=Ws**2
+                T.timeit("4")
+
+                # The following sums the channel-weighted beam along freq 
+                nchMax=100 # just used to reduce RAM usage (the code will do the average by channel chunks)
+                nchChunk=np.max([1,MSnchan//nchMax]) 
+                chMinMax=np.int32(np.linspace(0,MSnchan,nchChunk+1))
+                for ch0,ch1 in zip(chMinMax[:-1],chMinMax[1:]):
+                    
+                    WW=WWs.reshape((1,ind.size,MSnchan))[:,:,ch0:ch1]
+                    T.timeit("5")
+                    JJsq=WW*(JJ**2)[:,:,DicoBeam["VisToJonesChanMapping"][ch0:ch1]]
+                    T.timeit("6")
+                    SumWsqThisRange=np.sum(JJsq,axis=1)
+                    T.timeit("7")
+                    # stop
+                    
+                    SumWsq=np.sum(WW,axis=1)
+                    
+                    #print("!!!!!",iDir,ch0,ch1)
+                    for iBand in range(self.VS.NFreqBands):
+                        indFreqBand,=np.where(ChanToFreqBand[ch0:ch1]==iBand)
+                        if indFreqBand.size==0: continue
+                        
+                        ThisNch=ch1-ch0
+                        self.StackedBeamDict[iDir]["SumJJsq"][iBand]+=np.sum(SumWsqThisRange.reshape((ThisNch,))[indFreqBand])
+                        self.StackedBeamDict[iDir]["SumWsq"][iBand]+=np.sum(SumWsq.reshape((ThisNch,))[indFreqBand])
+                
+
+            #print SumWsq,self.SumWsq,self.SumJJsq.shape,J0.shape
+            T.timeit("9")
+            
+            #NDone = iTRange+1
+            #intPercent = int(100 * NDone / float(NTRange))
+            #pBAR.render(intPercent, '%4i/%i' % (NDone, NTRange))
+
+        T2.timeit("Stack")
+        logger.setLoud("ClassJones")
+  
+        
+    def Smooth(self):
+        #print self.SumWsq
+        self.StackedBeamDict.reload()
+        self.SumJJsq=np.zeros((self.npix_x,self.npix_y,self.VS.NFreqBands),np.float64)
+        self.SumWsq=np.zeros((1,self.VS.NFreqBands),np.float64)
+        self.SumWsq[0,:]=self.StackedBeamDict[0]["SumWsq"]
+        if np.max(self.StackedBeamDict[0]["SumWsq"])==0:
+            return "NoStackedData"
+        for iDir in range(self.NDir):
+            i,j=self.iPix[iDir],self.jPix[iDir]
+            self.SumJJsq[i,j,:]=self.StackedBeamDict[iDir]["SumJJsq"]
+
+        
+
+        self.SumJJsq/=self.SumWsq.reshape(1,1,self.VS.NFreqBands)
+        #self.SumJJsq=np.rollaxis(SumJJsq,2)#np.mean(SumJJsq,axis=2)
+
+
+        _,_,nx,ny=self.VS.FullImShape
+        CellSizeRad_x,CellSizeRad_y=self.VS.CellSizeRad
+        FOV_x=nx*CellSizeRad_x
+        FOV_y=ny*CellSizeRad_y
+        npix_x=nx
+        npix_y=ny
+        
+        lm=np.linspace(-FOV_x/2.,FOV_x/2.,npix_x+1)
+        ll=(lm[0:-1]+lm[1::])/2.
+        lmin=ll.min()
+        lmax=ll.max()
+
+        mm=np.linspace(-FOV_y/2.,FOV_y/2.,npix_y+1)
+        ml=(mm[0:-1]+mm[1::])/2.
+        mmin=ml.min()
+        mmax=ml.max()
+        
+        grid_x, grid_y = np.mgrid[lmin:lmax:1j*npix_x,mmin:mmax:1j*npix_y]
+        NPixOut_x,NPixOut_y=self.VS.FacetMachine.OutImShape[-2:]
+
+        points = np.zeros((self.lBeam.size,2),np.float32)
+        points[:,0]=self.lBeam.ravel()
+        points[:,1]=self.mBeam.ravel()
+        SmoothBeam=np.zeros((self.VS.NFreqBands,nx,ny),np.float32)
+        
+        
+        
+        for iBand in range(self.VS.NFreqBands):
+            if self.GD["Beam"]["SmoothInterpMode"].lower()=="log":
+                values=np.log(np.abs(self.SumJJsq[:,:,iBand].flatten()))
+                S = griddata(points, values, (grid_x, grid_y), method='cubic')
+                S=np.exp(S)
+            elif self.GD["Beam"]["SmoothInterpMode"].lower()=="linear":
+                values=self.SumJJsq[:,:,iBand].flatten()
+                S = griddata(points, values, (grid_x, grid_y), method='cubic')
+                # To avoid negative values in the interpolation
+                Sm=S.max()
+                SCut=1e-6*Sm
+                S[S<SCut]=SCut
+                
+            SmoothBeam[iBand] = S
+
+            
+        # # # to implement - spline interpolation
+        # # grid_x, grid_y = np.mgrid[0:1:NPixOut*1j, 0:1:NPixOut*1j]
+        # # points = np.random.rand(1000, 2)
+        # # x,y=np.mgrid[0:1:11j,0:1:11j]
+        # # x=x.ravel()
+        # # y=y.ravel()
+        # # points = np.zeros((x.size,2),np.float32)
+        # # points[:,0]=x
+        # # points[:,1]=y
+        # # values = func(points[:,0], points[:,1])
+        # # #grid_z0 = griddata(points, values, (grid_x, grid_y), method='nearest')
+        # # #grid_z1 = griddata(points, values, (grid_x, grid_y), method='linear')
+        # # t=time.time()
+        # # print "start"
+        # # grid_z2 = griddata(points, values, (grid_x, grid_y), method='cubic')
+        # # print "ok",time.time()-t
+
+        #self.SumJJsq=np.mean(self.SumJJsq,axis=2)
+        # _,_,nx,_=self.VS.FullImShape
+        
+        # SpheM=ModCF.SpheMachine(Support=self.npix,SupportSpheCalc=111)
+        # CF, fCF, ifzfCF=SpheM.MakeSphe(nx)
+        
+        
+        # ifzfCF.fill(1)
+        # SpheM.if_cut_fCF.fill(1)
+        
+        # FT=ModFFTW.FFTW_2Donly_np()
+        
+        # SumJJsq_Sphe=self.SumJJsq.copy()*SpheM.if_cut_fCF
+
+        # A=np.complex64(SumJJsq_Sphe.reshape((1,1,self.npix,self.npix)))
+        # f_SumJJsq=FT.fft(A).reshape((self.npix,self.npix))
+        # z_f_SumJJsq=np.complex64(ModCF.ZeroPad(f_SumJJsq,outshape=nx))
+        
+        # if_z_f_SumJJsq=FT.ifft(z_f_SumJJsq.reshape((1,1,nx,nx))).real.reshape((nx,nx))
+        # if_z_f_SumJJsq/=np.real(ifzfCF)#.reshape((1,1,nx,nx)))
+        # #if_z_f_SumJJsq[ifzfCF.real<1e-2]=-1.
+
+        # # vmin=0#self.SumJJsq.min()
+        # # vmax=self.SumJJsq.max()
+        # # import pylab
+        # # pylab.clf()
+        # # ax=pylab.subplot(1,3,1)
+        # # pylab.imshow(self.SumJJsq,interpolation="nearest",vmin=vmin,vmax=vmax,extent=(0,1,0,1))
+        # # pylab.colorbar()
+        # # pylab.subplot(1,3,2,sharex=ax,sharey=ax)
+        # # pylab.imshow(ifzfCF.real,interpolation="nearest",vmin=vmin,vmax=vmax,extent=(0,1,0,1))
+        # # pylab.colorbar()
+        # # pylab.subplot(1,3,3,sharex=ax,sharey=ax)
+        # # pylab.imshow(if_z_f_SumJJsq,interpolation="nearest",vmin=vmin,vmax=vmax,extent=(0,1,0,1))
+        # # pylab.colorbar()
+        # # pylab.show(False)
+        # # stop
+
+        # self.ifzfCF=np.real(ifzfCF)
+        # self.SmoothBeam=np.real(if_z_f_SumJJsq)
+
+        self.MeanSmoothBeam=np.mean(SmoothBeam,axis=0)
+        self.SmoothBeam=SmoothBeam
+
+        np.save(self.CachePath,self.SmoothBeam)
+        self.VS.maincache.saveCache("SmoothBeam.npy")
+        # print(ModColor.Str("======================= Done calculating smooth beams ===================="), file=log)
+        return "HasBeenComputed"
+
+       
+    def CheckCache(self):
+        reset=0
+        Dict=dict([("MSNames", [ms.MSName for ms in self.VS.ListMS])] +
+                  [(section, self.GD[section]) 
+                   for section in ["Data", 
+                   "Beam", "Selection",
+                   "Freq", "Image", 
+                   "Comp", "Facets", 
+                   "Weight", "RIME"]])
+
+        if self.GD["Cache"]["SmoothBeam"]=="auto": 
+            self.CachePath, self.CacheValid = self.VS.maincache.checkCache("SmoothBeam.npy", Dict, reset=0)
+        elif self.GD["Cache"]["SmoothBeam"]=="reset": 
+            self.CachePath, self.CacheValid = self.VS.maincache.checkCache("SmoothBeam.npy", Dict, reset=1)
+        elif self.GD["Cache"]["SmoothBeam"]=="force": 
+            self.CachePath = self.VS.maincache.getElementPath("SmoothBeam.npy")
+            self.CacheValid = os.path.exists(self.CachePath)
+        else:
+            raise ValueError("unknown --Cache-SmoothBeam setting %s"%self.GD["Cache"]["SmoothBeam"])
+
+        if self.CacheValid:
+            print("Found valid smooth beam in %s"%self.CachePath, file=log)
+            self.SmoothBeam=np.load(self.CachePath)
+            self.MeanSmoothBeam=np.mean(self.SmoothBeam,axis=0)
+
+
+    def GiveMergedWithDiscrete(self,DiscreteMeanBeam):
+        Mask=(self.ifzfCF<1e-2)
+        self.SmoothBeam[Mask]=DiscreteMeanBeam[Mask]
+        return self.SmoothBeam

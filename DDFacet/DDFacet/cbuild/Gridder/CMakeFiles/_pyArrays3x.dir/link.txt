@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -O3 -DNDEBUG -fopenmp -std=c++14 -ggdb3 -fmax-errors=1 -pedantic -W -Wall -Wconversion -DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION    -ffast-math -shared -Wl,-soname,_pyArrays3x.so -o _pyArrays3x.so CMakeFiles/_pyArrays3x.dir/Arrays.cc.o  -lrt -lpython3.9 

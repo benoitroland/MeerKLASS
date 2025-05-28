@@ -1,0 +1,13 @@
+#tab sourceparser.tab.tcl
+
+%{
+%}
+
+#include defs.fin
+
+%%
+
+#include string.fin
+#include ws.fin
+
+%%
