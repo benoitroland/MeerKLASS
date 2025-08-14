@@ -1,0 +1,62 @@
+o) apptainer reverse engineering
+
+apptainer sif list ddf.sif 
+apptainer sif info 1 ddf.sif 
+apptainer sif dump 1 ddf.sif
+apptainer sif dump 1 ddf.sif > ddf-dump.txt
+
+o) useful repositories
+
+https://github.com/cyriltasse
+https://github.com/saopicc/DDFacet
+https://github.com/lofar-astron
+https://www.ict.inaf.it/gitlab/lofarit
+
+o) image build
+
+docker build -t ddfacet-meerklass-debian . > log-ddfacet-meerklass-debian.txt 2>&1
+
+o) DDFacet OTF version
+
+Cyril is not the DDFacet author, but he has created a special version of the code that corrects for a systematic that is only present in the so-called on-the-fly (OTF) scan data.
+These OTF scan data are the ones that Aditya is testing.
+
+o) run sif image in interactive mode
+
+singularity shell --bind $PWD:/scratch ddf.sif
+
+o) copy from the container to the MeerKLASS repo
+
+singularity shell --bind ~/Astronomy-LMU/MeerKLASS:/scratch ddf.sif
+cp /usr/bin/setDev.sh /scratch
+
+o) check building process
+
+grep STEP log-ddfacet-meerklass-debian.txt
+
+grep ERROR log-ddfacet-meerklass-debian.txt
+grep Error log-ddfacet-meerklass-debian.txt | grep -v CalibError
+grep error log-ddfacet-meerklass-debian.txt | grep -v liberror | grep -v errors | grep -v Werror
+
+o) extract software versions
+
+singularity shell --bind $HOME/Astronomy-LMU/Software-version:/scratch ddf.sif
+pip list > /scratch/singularity-pip.txt
+apt list --installed  > /scratch/singularity-apt.txt
+
+docker run -it --rm --mount type=bind,src=$HOME/Astronomy-LMU/Software-version,dst=/scratch --name ddfacet-container localhost/ddfacet-meerklass-debian:latest
+pip list > /scratch/docker-pip.txt
+apt list --installed  > /scratch/docker-apt.txt
+
+o) fitsio github alternative
+
+RUN git clone -b 1.1.9 https://github.com/esheldon/fitsio.git
+
+o) LSMTool github alternative
+
+RUN git clone -b v1.4.11 https://github.com/darafferty/LSMTool.git
+
+o) test setup
+
+https://syncandshare.desy.de/index.php/s/JiwxyswJrfWobpg
+
